@@ -23,14 +23,30 @@ app.get('/api/hello', (req: Request, res: Response) => {
    res.json({ message: 'Hello, API!' });
 });
 
+// Change this line - store chat sessions instead of just responses
+const conversations = new Map<string, any>();
+
 app.post('/api/chat', async (req: Request, res: Response) => {
-   const { prompt } = req.body;
+   const { prompt, conversationId } = req.body;
 
-   const model = client.getGenerativeModel({ model: 'gemini-2.5-pro' });
-   const response = await model.generateContent(prompt);
-   const result = response.response.text();
+   const model = client.getGenerativeModel({ model: 'gemini-flash-latest' });
 
-   res.json({ message: result });
+   // Get or create a chat session for this conversation
+   let chat = conversations.get(conversationId);
+   if (!chat) {
+      chat = model.startChat({
+         history: [],
+      });
+      conversations.set(conversationId, chat);
+   }
+
+   // Send message in the chat session
+   const result = await chat.sendMessage(prompt);
+   const responseText = result.response.text();
+
+   res.json({
+      message: responseText,
+   });
 });
 
 app.listen(port, () => {

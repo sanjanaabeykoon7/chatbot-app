@@ -43,26 +43,31 @@ app.post('/api/chat', async (req: Request, res: Response) => {
       return;
    }
 
-   const { prompt, conversationId } = req.body;
+   try {
+      const { prompt, conversationId } = req.body;
+      const model = client.getGenerativeModel({ model: 'gemini-flash-latest' });
 
-   const model = client.getGenerativeModel({ model: 'gemini-flash-latest' });
+      // Get or create a chat session for this conversation
+      let chat = conversations.get(conversationId);
+      if (!chat) {
+         chat = model.startChat({
+            history: [],
+         });
+         conversations.set(conversationId, chat);
+      }
 
-   // Get or create a chat session for this conversation
-   let chat = conversations.get(conversationId);
-   if (!chat) {
-      chat = model.startChat({
-         history: [],
+      // Send message in the chat session
+      const result = await chat.sendMessage(prompt);
+      const responseText = result.response.text();
+
+      res.json({
+         message: responseText,
       });
-      conversations.set(conversationId, chat);
+   } catch (error) {
+      res.status(500).json({
+         error: 'An error occurred while processing your request.',
+      });
    }
-
-   // Send message in the chat session
-   const result = await chat.sendMessage(prompt);
-   const responseText = result.response.text();
-
-   res.json({
-      message: responseText,
-   });
 });
 
 app.listen(port, () => {

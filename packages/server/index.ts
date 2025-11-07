@@ -2,19 +2,30 @@ import express from 'express';
 import type { Request, Response } from 'express';
 import dotenv from 'dotenv';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { ConversationRepository } from './repositories/conversation.repository';
+import { ChatService } from './services/chat.service';
+import { ChatController } from './controllers/chat.controller';
 
 dotenv.config();
 
+// Validate environment variables
 const apiKey = process.env.GEMINI_API_KEY;
 if (!apiKey) {
    throw new Error('GEMINI_API_KEY is not set in the environment');
 }
-const client = new GoogleGenerativeAI(apiKey);
 
+// Initialize dependencies
+const client = new GoogleGenerativeAI(apiKey);
+const conversationRepository = new ConversationRepository(client);
+const chatService = new ChatService(conversationRepository);
+const chatController = new ChatController(chatService);
+
+// Initialize Express app
 const app = express();
 app.use(express.json());
 const port = process.env.PORT || 3000;
 
+// Routes
 app.get('/', (req: Request, res: Response) => {
    res.send('Hello from the server package!');
 });
@@ -23,16 +34,12 @@ app.get('/api/hello', (req: Request, res: Response) => {
    res.json({ message: 'Hello, API!' });
 });
 
-app.post('/api/chat', async (req: Request, res: Response) => {
-   const { prompt } = req.body;
-
-   const model = client.getGenerativeModel({ model: 'gemini-2.5-pro' });
-   const response = await model.generateContent(prompt);
-   const result = response.response.text();
-
-   res.json({ message: result });
+// Chat endpoint - bind controller method to preserve 'this' context
+app.post('/api/chat', (req: Request, res: Response) => {
+   chatController.handleChat(req, res);
 });
 
+// Start server
 app.listen(port, () => {
    console.log(`Server is running on http://localhost:${port}`);
 });
